@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📊 PAINEL JVE.11</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+body{font-family:Arial;background:#0f172a;color:white;margin:0;padding:20px}
+h1{margin-bottom:10px}
+table{width:100%;border-collapse:collapse;background:white;color:black}
+th,td{padding:6px;text-align:center;border:1px solid #ddd;font-size:12px}
+th{background:#2563eb;color:white}
+.kpi{font-size:18px;margin:10px 0}
+.box{padding:10px;border-radius:6px;margin-bottom:10px}
+.ok{background:#10b981}
+.error{background:#ef4444}
+canvas{background:white;border-radius:6px}
+</style>
+</head>
+<body>
+
+<h1>📊 PAINEL DE PRODUTIVIDADE JVE.11</h1>
+
+<div id="status" class="box ok">Carregando...</div>
+
+<div class="kpi">
+Total Geral: <span id="total-geral">-</span> |
+Sucesso: <span id="total-sucesso">-</span> |
+Sem Sucesso: <span id="total-sem-sucesso">-</span> |
+Eficácia: <span id="eficacia-media">-</span>
+</div>
+
+<canvas id="chart" height="100"></canvas>
+
+<br>
+
+<table>
+<thead>
+<tr>
+<th>TÉCNICO</th>
+<th>TR</th>
+<th>01</th><th>02</th><th>03</th><th>04</th><th>05</th><th>06</th><th>07</th><th>08</th><th>09</th><th>10</th><th>11</th><th>12</th><th>13</th>
+<th>SUCESSO</th><th>SEM</th><th>TOTAL</th><th>EFIC.</th>
+</tr>
+</thead>
+<tbody id="body"></tbody>
+</table>
+
+<script>
+
+const SHEET_ID = "2PACX-1vSUVJXJOB7UA6HNo-fv4k0fMvDSlIsXXpBh47u2FGMjZWNKKkv0mHyBW8QeskoaGGknu_N8DxkVYONC";
+const URL = `https://docs.google.com/spreadsheets/d/e/${SHEET_ID}/gviz/tq?tqx=out:json`;
+
+async function load(){
+
+try{
+
+    const r = await fetch(URL);
+    const text = await r.text();
+
+    const json = JSON.parse(text.substr(47).slice(0,-2));
+    const rows = json.table.rows;
+
+    montar(rows);
+
+    document.getElementById("status").innerHTML = "Dados atualizados automaticamente";
+    document.getElementById("status").className = "box ok";
+
+}catch(e){
+    document.getElementById("status").innerHTML = "Erro ao conectar com Google Sheets";
+    document.getElementById("status").className = "box error";
+    console.error(e);
+}
+
+}
+
+function montar(rows){
+
+const body = document.getElementById("body");
+body.innerHTML="";
+
+let total=0,sucesso=0,sem=0;
+let diasTotal=Array(13).fill(0);
+
+rows.forEach(r=>{
+
+    if(!r.c || !r.c[0] || !r.c[0].v) return;
+    if(r.c[0].v.toString().toUpperCase().includes("TOTAL")) return;
+
+    const nome = r.c[0]?.v || "";
+    const tr = r.c[1]?.v || "";
+
+    const dias = [];
+    for(let i=2;i<=14;i++){
+        dias.push(parseInt(r.c[i]?.v)||0);
+    }
+
+    const s = parseInt(r.c[15]?.v)||0;
+    const sm = parseInt(r.c[16]?.v)||0;
+    const t = parseInt(r.c[17]?.v)||0;
+    const ef = parseFloat(r.c[18]?.v)||0;
+
+    total+=t;
+    sucesso+=s;
+    sem+=sm;
+
+    dias.forEach((v,i)=>diasTotal[i]+=v);
+
+    const row=document.createElement("tr");
+    row.innerHTML=`
+    <td>${nome}</td>
+    <td>${tr}</td>
+    ${dias.map(d=>`<td>${d}</td>`).join("")}
+    <td>${s}</td>
+    <td>${sm}</td>
+    <td>${t}</td>
+    <td>${ef.toFixed(1)}%</td>
+    `;
+    body.appendChild(row);
+
+});
+
+const eficacia = total>0 ? (sucesso/total*100) : 0;
+
+document.getElementById("total-geral").innerText=total;
+document.getElementById("total-sucesso").innerText=sucesso;
+document.getElementById("total-sem-sucesso").innerText=sem;
+document.getElementById("eficacia-media").innerText=eficacia.toFixed(1)+"%";
+
+if(window.chart) window.chart.destroy();
+
+const ctx=document.getElementById("chart").getContext("2d");
+window.chart=new Chart(ctx,{
+type:"line",
+data:{
+labels:["01","02","03","04","05","06","07","08","09","10","11","12","13"],
+datasets:[{
+data:diasTotal,
+borderColor:"#2563eb",
+backgroundColor:"rgba(37,99,235,0.2)",
+fill:true
+}]
+}
+});
+
+}
+
+window.onload=load;
+
+</script>
+</body>
+</html>
